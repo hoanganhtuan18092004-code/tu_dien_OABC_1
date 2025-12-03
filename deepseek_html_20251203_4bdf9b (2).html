@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solid Tetrahedron IFS 3D - Three.js Visualization</title>
+    
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for camera interaction -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script>
+        // Cấu hình MathJax trước khi load
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            startup: {
+                pageReady: () => {
+                    return MathJax.startup.defaultPageReady();
+                }
+            }
+        };
+    </script>
+    <!-- URL MathJax -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script"></script>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        canvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            width: 320px;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+        }
+        #math-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #555;
+            max-width: 420px;
+            font-size: 14px;
+            z-index: 5;
+            backdrop-filter: blur(5px);
+        }
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 10;
+        }
+        .slider-container {
+            margin-bottom: 15px;
+        }
+        input[type=range] {
+            width: 100%;
+            margin: 5px 0;
+        }
+        h1 {
+            font-size: 18px;
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #4af;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 15px 0 5px 0;
+            color: #4fa;
+        }
+        p {
+            margin: 4px 0;
+            font-size: 14px;
+            color: #ccc;
+        }
+        #val-display {
+            font-weight: bold;
+            color: #0f0;
+        }
+        button {
+            background: linear-gradient(135deg, #333, #555);
+            color: white;
+            border: 1px solid #666;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 5px;
+            margin-right: 5px;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        button:hover {
+            background: linear-gradient(135deg, #444, #666);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        button.download {
+            background: linear-gradient(135deg, #2a7, #3b8);
+        }
+        button.download:hover {
+            background: linear-gradient(135deg, #3b8, #4c9);
+        }
+        .control-group {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+        .stats {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+        .color-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .red { background-color: #ff3333; }
+        .green { background-color: #33ff33; }
+        #download-modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #555;
+            z-index: 100;
+            display: none;
+            min-width: 300px;
+        }
+        .modal-content {
+            text-align: center;
+        }
+        .modal-buttons {
+            margin-top: 20px;
+        }
+        .modal-buttons button {
+            margin: 0 5px;
+        }
+        #format-select {
+            background: #333;
+            color: white;
+            border: 1px solid #666;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 10px 0;
+            width: 100%;
+        }
+        #filename-input {
+            background: #333;
+            color: white;
+            border: 1px solid #666;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 10px 0;
+            width: 100%;
+        }
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<div id="container3d"></div>
+
+<div id="controls">
+    <h1>🎯 3D Attractor Visualization - IFS Tetrahedron</h1>
+    
+    <div class="control-group">
+        <h2>📐 IFS Parameters</h2>
+        <div class="slider-container">
+            <label for="a-range">Parameter a: <span id="val-display">0.50</span></label><br>
+            <input type="range" id="a-range" min="0.01" max="0.99" step="0.01" value="0.5">
+        </div>
+        <p style="font-size: 12px; margin-top: 8px;">
+            <span class="color-indicator red"></span><strong>f₁ (Red):</strong> Probability = a<br>
+            <span class="color-indicator green"></span><strong>f₂ (Green):</strong> Probability = 1 - a
+        </p>
+    </div>
+    
+    <div class="control-group">
+        <h2>🎮 Visualization Controls</h2>
+        <button onclick="resetAttractor()">🔄 Reset Attractor</button>
+        <button onclick="toggleRotation()">⏸️ Toggle Auto-Rotation</button>
+        <button onclick="changePointSize()">🔍 Change Point Size</button>
+        <button onclick="resetCamera()">🎥 Reset Camera</button>
+    </div>
+    
+    <div class="control-group">
+        <h2>💾 Data Export</h2>
+        <button onclick="showDownloadModal()" class="download">📥 Download Point Cloud</button>
+        <p style="font-size: 12px; margin-top: 5px;">
+            Export attractor points in various formats for analysis
+        </p>
+    </div>
+    
+    <div class="control-group">
+        <h2>⚙️ Simulation Settings</h2>
+        <div class="slider-container">
+            <label for="speed-range">Animation Speed: <span id="speed-display">1.0</span></label><br>
+            <input type="range" id="speed-range" min="0.1" max="5" step="0.1" value="1">
+        </div>
+        <div class="slider-container">
+            <label for="points-range">Points per Frame: <span id="points-display">2000</span></label><br>
+            <input type="range" id="points-range" min="100" max="10000" step="100" value="2000">
+        </div>
+    </div>
+    
+    <div class="stats">
+        <p>Total Points: <span id="total-points">0</span></p>
+        <p>Frame Rate: <span id="fps">0</span> FPS</p>
+        <p>Memory: <span id="memory-usage">0</span> MB</p>
+        <p>Download Size: <span id="download-size">0</span> KB</p>
+    </div>
+</div>
+
+<div id="math-display">
+    <p><strong>📐 IFS Transformation System:</strong></p>
+    <p>
+        \[
+        \mathbf{f}_1(\mathbf{x}) = 
+        \begin{pmatrix} 
+        0 & 0 & a \\ 
+        1 & 0 & 0 \\ 
+        0 & 1 & 0 
+        \end{pmatrix} 
+        \begin{pmatrix} x \\ y \\ z \end{pmatrix}
+        \]
+    </p>
+    <p>
+        \[
+        \mathbf{f}_2(\mathbf{x}) = 
+        \begin{pmatrix} 
+        -a & -a & 1-a \\ 
+        1 & 0 & 0 \\ 
+        0 & 1 & 0 
+        \end{pmatrix} 
+        \begin{pmatrix} x \\ y \\ z \end{pmatrix} 
+        + 
+        \begin{pmatrix} a \\ 0 \\ 0 \end{pmatrix}
+        \]
+    </p>
+    <p><strong>🎮 Camera Controls:</strong></p>
+    <p>• Left Mouse: Rotate View</p>
+    <p>• Right Mouse: Pan View</p>
+    <p>• Scroll Wheel: Zoom In/Out</p>
+</div>
+
+<div id="instructions">
+    <p>🖱️ <strong>Mouse Controls:</strong> Drag to rotate • Scroll to zoom • Right-drag to pan</p>
+</div>
+
+<!-- Download Modal -->
+<div id="download-modal">
+    <button class="close-modal" onclick="closeDownloadModal()">×</button>
+    <div class="modal-content">
+        <h3 style="margin-top: 0;">📥 Download Point Cloud Data</h3>
+        
+        <div class="slider-container">
+            <label for="download-points">Number of points to export:</label><br>
+            <input type="range" id="download-points" min="100" max="100000" step="100" value="10000">
+            <span id="download-points-display">10,000</span> points
+        </div>
+        
+        <div class="slider-container">
+            <label for="filename-input">Filename:</label><br>
+            <input type="text" id="filename-input" value="attractor_points" placeholder="Enter filename">
+        </div>
+        
+        <div class="slider-container">
+            <label for="format-select">Export Format:</label><br>
+            <select id="format-select">
+                <option value="json">JSON (Full Data)</option>
+                <option value="js">JavaScript Module</option>
+                <option value="csv">CSV (Comma Separated)</option>
+                <option value="xyz">XYZ (Plain Text)</option>
+                <option value="ply">PLY (Stanford Format)</option>
+            </select>
+        </div>
+        
+        <div class="slider-container">
+            <label for="include-color">Include color data:</label>
+            <input type="checkbox" id="include-color" checked>
+        </div>
+        
+        <p id="file-size-estimate" style="font-size: 12px; color: #aaa;">
+            Estimated file size: <span id="size-estimate">0</span> KB
+        </p>
+        
+        <div class="modal-buttons">
+            <button onclick="exportData()" class="download">📥 Download Now</button>
+            <button onclick="closeDownloadModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // === THREE.JS INITIALIZATION ===
+    let scene, camera, renderer, controls;
+    let redPointsGeometry, greenPointsGeometry;
+    let redPointsMaterial, greenPointsMaterial;
+    let redPointsMesh, greenPointsMesh;
+    let attractorPoints = [];
+    
+    // Simulation parameters
+    let a = 0.5;
+    let x = 0, y = 0, z = 0;
+    let POINTS_PER_FRAME = 2000;
+    const MAX_POINTS = 100000;
+    let pointSize = 0.03;
+    let autoRotate = true;
+    let rotationSpeed = 0.5;
+    let animationSpeed = 1.0;
+    let frameCount = 0;
+    let lastTime = performance.now();
+    let fps = 0;
+    
+    // Initialize Three.js
+    function initThreeJS() {
+        // Create scene
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0a);
+        
+        // Create camera
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(3, 3, 3);
+        
+        // Create renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.getElementById('container3d').appendChild(renderer.domElement);
+        
+        // Add OrbitControls
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.rotateSpeed = 0.5;
+        controls.autoRotate = autoRotate;
+        controls.autoRotateSpeed = rotationSpeed;
+        
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 10, 5);
+        scene.add(directionalLight);
+        
+        // Create coordinate system helper
+        const axesHelper = new THREE.AxesHelper(2);
+        scene.add(axesHelper);
+        
+        // Create grid helper
+        const gridHelper = new THREE.GridHelper(5, 20, 0x444444, 0x222222);
+        scene.add(gridHelper);
+        
+        // Initialize point geometries
+        initPointGeometries();
+    }
+    
+    function initPointGeometries() {
+        // Create geometries for red and green points
+        redPointsGeometry = new THREE.BufferGeometry();
+        greenPointsGeometry = new THREE.BufferGeometry();
+        
+        // Create materials with different colors
+        redPointsMaterial = new THREE.PointsMaterial({
+            color: 0xff3333,
+            size: pointSize,
+            transparent: true,
+            opacity: 0.8,
+            sizeAttenuation: true
+        });
+        
+        greenPointsMaterial = new THREE.PointsMaterial({
+            color: 0x33ff33,
+            size: pointSize,
+            transparent: true,
+            opacity: 0.8,
+            sizeAttenuation: true
+        });
+        
+        // Create meshes
+        redPointsMesh = new THREE.Points(redPointsGeometry, redPointsMaterial);
+        greenPointsMesh = new THREE.Points(greenPointsGeometry, greenPointsMaterial);
+        
+        scene.add(redPointsMesh);
+        scene.add(greenPointsMesh);
+    }
+    
+    function updatePointGeometries() {
+        // Separate red and green points
+        const redPositions = [];
+        const greenPositions = [];
+        
+        for (const point of attractorPoints) {
+            const positionArray = point.isRed ? redPositions : greenPositions;
+            positionArray.push(point.x, point.y, point.z);
+        }
+        
+        // Update red points geometry
+        redPointsGeometry.setAttribute('position', 
+            new THREE.Float32BufferAttribute(redPositions, 3));
+        redPointsGeometry.attributes.position.needsUpdate = true;
+        
+        // Update green points geometry
+        greenPointsGeometry.setAttribute('position', 
+            new THREE.Float32BufferAttribute(greenPositions, 3));
+        greenPointsGeometry.attributes.position.needsUpdate = true;
+        
+        // Update stats and download size
+        updateStats();
+        updateDownloadSize();
+    }
+    
+    function generatePoints() {
+        const iterations = Math.floor(POINTS_PER_FRAME * animationSpeed);
+        
+        for (let i = 0; i < iterations; i++) {
+            const r = Math.random();
+            let nextX, nextY, nextZ;
+            let isRed = false;
+            
+            if (r < a) {
+                // f1 - Red transformation
+                nextX = a * z;
+                nextY = x;
+                nextZ = y;
+                isRed = true;
+            } else {
+                // f2 - Green transformation
+                nextX = -a * x - a * y + (1 - a) * z + a;
+                nextY = x;
+                nextZ = y;
+                isRed = false;
+            }
+            
+            x = nextX;
+            y = nextY;
+            z = nextZ;
+            
+            // Add new point
+            const newPoint = { x, y, z, isRed };
+            
+            if (attractorPoints.length < MAX_POINTS) {
+                attractorPoints.push(newPoint);
+            } else {
+                // Replace random old point
+                const randomIndex = Math.floor(Math.random() * MAX_POINTS);
+                attractorPoints[randomIndex] = newPoint;
+            }
+        }
+        
+        updatePointGeometries();
+    }
+    
+    function updateStats() {
+        document.getElementById('total-points').textContent = attractorPoints.length.toLocaleString();
+        
+        // Calculate FPS
+        frameCount++;
+        const currentTime = performance.now();
+        if (currentTime - lastTime >= 1000) {
+            fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
+            document.getElementById('fps').textContent = fps;
+            
+            // Estimate memory usage (rough approximation)
+            const memoryMB = (attractorPoints.length * 16 / (1024 * 1024)).toFixed(2);
+            document.getElementById('memory-usage').textContent = memoryMB;
+            
+            frameCount = 0;
+            lastTime = currentTime;
+        }
+    }
+    
+    function updateDownloadSize() {
+        // Estimate file size for download
+        const numPoints = Math.min(attractorPoints.length, parseInt(document.getElementById('download-points').value));
+        const format = document.getElementById('format-select').value;
+        const includeColor = document.getElementById('include-color').checked;
+        
+        let sizeInBytes;
+        
+        switch(format) {
+            case 'json':
+                sizeInBytes = numPoints * (includeColor ? 80 : 50); // Rough estimate
+                break;
+            case 'js':
+                sizeInBytes = numPoints * (includeColor ? 70 : 40);
+                break;
+            case 'csv':
+                sizeInBytes = numPoints * (includeColor ? 30 : 20);
+                break;
+            case 'xyz':
+                sizeInBytes = numPoints * (includeColor ? 40 : 25);
+                break;
+            case 'ply':
+                sizeInBytes = numPoints * (includeColor ? 60 : 35);
+                break;
+            default:
+                sizeInBytes = numPoints * 50;
+        }
+        
+        const sizeInKB = (sizeInBytes / 1024).toFixed(2);
+        document.getElementById('size-estimate').textContent = sizeInKB;
+        document.getElementById('download-size').textContent = sizeInKB;
+    }
+    
+    // === DATA EXPORT FUNCTIONS ===
+    function showDownloadModal() {
+        const modal = document.getElementById('download-modal');
+        modal.style.display = 'block';
+        
+        // Update download points slider
+        const pointsSlider = document.getElementById('download-points');
+        const maxPoints = Math.min(attractorPoints.length, 100000);
+        pointsSlider.max = maxPoints;
+        pointsSlider.value = Math.min(10000, maxPoints);
+        
+        // Update display
+        updateDownloadPointsDisplay();
+        updateDownloadSize();
+    }
+    
+    function closeDownloadModal() {
+        document.getElementById('download-modal').style.display = 'none';
+    }
+    
+    function updateDownloadPointsDisplay() {
+        const slider = document.getElementById('download-points');
+        const display = document.getElementById('download-points-display');
+        display.textContent = parseInt(slider.value).toLocaleString();
+        updateDownloadSize();
+    }
+    
+    function exportData() {
+        const format = document.getElementById('format-select').value;
+        const filename = document.getElementById('filename-input').value || 'attractor_points';
+        const includeColor = document.getElementById('include-color').checked;
+        const maxPoints = parseInt(document.getElementById('download-points').value);
+        
+        // Get subset of points
+        const pointsToExport = attractorPoints.slice(0, Math.min(maxPoints, attractorPoints.length));
+        
+        // Generate data based on format
+        let data, mimeType, extension;
+        
+        switch(format) {
+            case 'json':
+                const jsonData = {
+                    metadata: {
+                        format: "IFS Attractor Point Cloud",
+                        version: "1.0",
+                        date: new Date().toISOString(),
+                        parameters: { a: a },
+                        totalPoints: pointsToExport.length,
+                        includesColor: includeColor
+                    },
+                    points: pointsToExport.map(p => ({
+                        x: parseFloat(p.x.toFixed(6)),
+                        y: parseFloat(p.y.toFixed(6)),
+                        z: parseFloat(p.z.toFixed(6)),
+                        ...(includeColor && { color: p.isRed ? "red" : "green" })
+                    }))
+                };
+                data = JSON.stringify(jsonData, null, 2);
+                mimeType = 'application/json';
+                extension = 'json';
+                break;
+                
+            case 'js':
+                const jsData = `// IFS Attractor Point Cloud Data
+// Generated on ${new Date().toISOString()}
+// Parameters: a = ${a}
+// Total points: ${pointsToExport.length}
+
+const attractorData = {
+    parameters: { a: ${a} },
+    points: ${JSON.stringify(pointsToExport.map(p => ({
+        x: parseFloat(p.x.toFixed(6)),
+        y: parseFloat(p.y.toFixed(6)),
+        z: parseFloat(p.z.toFixed(6)),
+        ...(includeColor && { color: p.isRed ? "red" : "green" })
+    })), null, 2)}
+};
+
+export default attractorData;`;
+                data = jsData;
+                mimeType = 'application/javascript';
+                extension = 'js';
+                break;
+                
+            case 'csv':
+                let csvData = 'x,y,z' + (includeColor ? ',color\n' : '\n');
+                pointsToExport.forEach(p => {
+                    csvData += `${p.x.toFixed(6)},${p.y.toFixed(6)},${p.z.toFixed(6)}`;
+                    if (includeColor) {
+                        csvData += `,${p.isRed ? 'red' : 'green'}`;
+                    }
+                    csvData += '\n';
+                });
+                data = csvData;
+                mimeType = 'text/csv';
+                extension = 'csv';
+                break;
+                
+            case 'xyz':
+                let xyzData = '';
+                if (includeColor) {
+                    xyzData = '# X Y Z R G B\n';
+                    pointsToExport.forEach(p => {
+                        const r = p.isRed ? 255 : 0;
+                        const g = p.isRed ? 0 : 255;
+                        const b = 0;
+                        xyzData += `${p.x.toFixed(6)} ${p.y.toFixed(6)} ${p.z.toFixed(6)} ${r} ${g} ${b}\n`;
+                    });
+                } else {
+                    pointsToExport.forEach(p => {
+                        xyzData += `${p.x.toFixed(6)} ${p.y.toFixed(6)} ${p.z.toFixed(6)}\n`;
+                    });
+                }
+                data = xyzData;
+                mimeType = 'text/plain';
+                extension = 'xyz';
+                break;
+                
+            case 'ply':
+                const vertexCount = pointsToExport.length;
+                let plyData = `ply
+format ascii 1.0
+comment IFS Attractor Point Cloud
+comment Generated on ${new Date().toISOString()}
+comment Parameter a = ${a}
+element vertex ${vertexCount}
+property float x
+property float y
+property float z`;
+                
+                if (includeColor) {
+                    plyData += `
+property uchar red
+property uchar green
+property uchar blue`;
+                }
+                
+                plyData += `
+end_header\n`;
+                
+                pointsToExport.forEach(p => {
+                    plyData += `${p.x.toFixed(6)} ${p.y.toFixed(6)} ${p.z.toFixed(6)}`;
+                    if (includeColor) {
+                        const r = p.isRed ? 255 : 0;
+                        const g = p.isRed ? 0 : 255;
+                        const b = 0;
+                        plyData += ` ${r} ${g} ${b}`;
+                    }
+                    plyData += '\n';
+                });
+                
+                data = plyData;
+                mimeType = 'text/plain';
+                extension = 'ply';
+                break;
+        }
+        
+        // Create download link
+        const blob = new Blob([data], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.${extension}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        // Close modal
+        closeDownloadModal();
+    }
+    
+    // === CONTROL FUNCTIONS ===
+    function resetAttractor() {
+        attractorPoints = [];
+        x = y = z = 0;
+        updatePointGeometries();
+    }
+    
+    function toggleRotation() {
+        autoRotate = !autoRotate;
+        controls.autoRotate = autoRotate;
+        const button = document.querySelector('button[onclick="toggleRotation()"]');
+        button.textContent = autoRotate ? '⏸️ Pause Rotation' : '▶️ Resume Rotation';
+    }
+    
+    function changePointSize() {
+        pointSize = pointSize === 0.03 ? 0.01 : pointSize === 0.01 ? 0.05 : 0.03;
+        redPointsMaterial.size = pointSize;
+        greenPointsMaterial.size = pointSize;
+    }
+    
+    function resetCamera() {
+        camera.position.set(3, 3, 3);
+        controls.reset();
+    }
+    
+    // === EVENT LISTENERS ===
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Three.js
+        initThreeJS();
+        
+        // Set up event listeners for sliders
+        const aSlider = document.getElementById('a-range');
+        const speedSlider = document.getElementById('speed-range');
+        const pointsSlider = document.getElementById('points-range');
+        const downloadPointsSlider = document.getElementById('download-points');
+        const formatSelect = document.getElementById('format-select');
+        const includeColorCheckbox = document.getElementById('include-color');
+        
+        aSlider.addEventListener('input', function() {
+            a = parseFloat(this.value);
+            document.getElementById('val-display').textContent = a.toFixed(2);
+            resetAttractor();
+        });
+        
+        speedSlider.addEventListener('input', function() {
+            animationSpeed = parseFloat(this.value);
+            document.getElementById('speed-display').textContent = animationSpeed.toFixed(1);
+        });
+        
+        pointsSlider.addEventListener('input', function() {
+            POINTS_PER_FRAME = parseInt(this.value);
+            document.getElementById('points-display').textContent = POINTS_PER_FRAME.toLocaleString();
+        });
+        
+        downloadPointsSlider.addEventListener('input', updateDownloadPointsDisplay);
+        formatSelect.addEventListener('change', updateDownloadSize);
+        includeColorCheckbox.addEventListener('change', updateDownloadSize);
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Generate new points
+            generatePoints();
+            
+            // Update controls
+            controls.update();
+            
+            // Render scene
+            renderer.render(scene, camera);
+        }
+        
+        // Start animation
+        animate();
+        
+        // Initialize MathJax
+        if (window.MathJax) {
+            MathJax.typesetPromise().catch(console.error);
+        }
+    });
+</script>
+
+</body>
+</html>
